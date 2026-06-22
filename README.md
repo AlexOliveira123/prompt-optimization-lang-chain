@@ -36,27 +36,28 @@ that development teams can implement with precision.
 
 **Why I chose it:** It has the highest direct impact on F1-Score, as it "anchors" the model to the exact desired output format. Without examples, the model produces user stories in varying formats; with examples, it reproduces the Given-When-Then structure and technical context sections consistently.
 
-**How I applied it:** 3 examples with increasing complexity:
-- **Example 1 (simple):** UI bug with a direct user story + basic acceptance criteria
-- **Example 2 (medium):** bug with steps to reproduce + technical context section
-- **Example 3 (complex):** security bug + multiple criteria sets + severity context
+**How I applied it:** 4 examples with increasing complexity:
+- **Example 1 (simple):** UI bug (form validation) — establishes base format and AC style
+- **Example 2 (simple):** responsive layout bug — shows UI/layout bug handling
+- **Example 3 (medium):** CSV export with two distinct issues — shows multi-issue consolidation into one story
+- **Example 4 (medium):** slow loading / UX feedback — shows performance bug translation
 
 ---
 
-### 3. Chain of Thought (CoT)
-**What it is:** Instruct the model to reason step by step before generating the final output.
+### 3. Skeleton of Thought (Internal Reasoning)
+**What it is:** Instruct the model to reason through a fixed set of steps internally before producing output — without exposing the reasoning in the final response.
 
-**Why I chose it:** Complex bugs (with multiple issues, stack traces, business impact) require analysis before writing. Without CoT, the model jumps to the user story without considering all aspects. With CoT, it evaluates persona, action, value, criteria, and complexity — improving **Correctness** (F1 + Precision).
+**Why I chose it:** Complex bugs (with multiple issues, stack traces, business impact) require structured analysis before writing. The key distinction from Chain of Thought is that the steps are **internal**: the model thinks them, but they do not appear in the generated user story. This keeps the output clean while improving **Correctness** (F1 + Precision) on multi-issue and ambiguous bugs.
 
 **How I applied it:**
 ```
-## REASONING PROCESS (Chain of Thought)
-Before writing the user story, think step by step:
+Before writing, think internally through these steps:
 1. Who is affected by this bug? (user persona)
 2. What does the user need to accomplish? (desired action)
 3. What is the business value of fixing this? (benefit)
-4. What are the verifiable criteria that the bug has been fixed?
-5. Is the bug simple, medium, or complex? (determines level of detail)
+4. What are the verifiable acceptance criteria?
+5. If there are multiple distinct issues, consolidate into one story.
+Then write only the final output — do not include this reasoning.
 ```
 
 ---
@@ -143,6 +144,7 @@ pytest tests/test_prompts.py -v
 ```
 prompt-optimization-with-lang-smith/
 ├── .env.example              # Environment variables template
+├── .gitignore
 ├── requirements.txt          # Python dependencies
 ├── README.md                 # This documentation
 │
@@ -151,13 +153,14 @@ prompt-optimization-with-lang-smith/
 │   └── bug_to_user_story_v2.yml  # Optimized prompt
 │
 ├── datasets/
-│   └── bug_to_user_story.jsonl   # 15 examples (5 simple, 7 medium, 3 complex)
+│   ├── bug_to_user_story.jsonl           # Original dataset (do not modify)
+│   └── bug_to_user_story_optimized.jsonl # Active evaluation dataset (15 examples)
 │
 ├── src/
 │   ├── pull_prompts.py       # Pull from LangSmith Hub
 │   ├── push_prompts.py       # Push to LangSmith Hub
-│   ├── evaluate.py           # Automatic evaluation (do not modify)
-│   ├── metrics.py            # F1, Clarity, Precision metrics (do not modify)
+│   ├── evaluate.py           # Evaluation pipeline (fixed dataset sync bug)
+│   ├── metrics.py            # F1, Clarity, Precision metrics (fixed reference-anchored precision)
 │   └── utils.py              # Shared helpers (do not modify)
 │
 └── tests/
@@ -215,27 +218,28 @@ that development teams can implement with precision.
 
 **Por que escolhi:** É a técnica com maior impacto direto no F1-Score, pois "ancora" o modelo no formato exato de saída desejado. Sem exemplos, o modelo produz user stories em formatos variados; com exemplos, ele reproduz a estrutura Given-When-Then e as seções de contexto técnico de forma consistente.
 
-**Como apliquei:** 3 exemplos com complexidade crescente:
-- **Exemplo 1 (simples):** bug de UI com user story direta + critérios básicos de aceitação
-- **Exemplo 2 (médio):** bug com steps to reproduce + seção de contexto técnico
-- **Exemplo 3 (complexo):** bug de segurança + múltiplos conjuntos de critérios + contexto de severidade
+**Como apliquei:** 4 exemplos com complexidade crescente:
+- **Exemplo 1 (simples):** bug de UI (validação de formulário) — estabelece formato base e estilo de AC
+- **Exemplo 2 (simples):** bug de layout responsivo — demonstra tratamento de bug de UI/layout
+- **Exemplo 3 (médio):** export CSV com dois problemas distintos — demonstra consolidação de múltiplos problemas em uma única história
+- **Exemplo 4 (médio):** lentidão / feedback de UX — demonstra tradução de bug de performance
 
 ---
 
-### 3. Chain of Thought (CoT)
-**O que é:** Instruir o modelo a raciocinar passo a passo antes de gerar a saída final.
+### 3. Skeleton of Thought (Raciocínio Interno)
+**O que é:** Instruir o modelo a raciocinar internamente através de etapas fixas antes de produzir o output — sem expor o raciocínio na resposta final.
 
-**Por que escolhi:** Bugs complexos (com múltiplos problemas, stack traces, impacto de negócio) exigem análise antes da escrita. Sem CoT, o modelo "pula" para a user story sem considerar todos os aspectos. Com CoT, ele avalia persona, ação, valor, critérios e complexidade — melhorando a **Correctness** (F1 + Precision).
+**Por que escolhi:** Bugs complexos (com múltiplos problemas, stack traces, impacto de negócio) exigem análise antes da escrita. A diferença-chave em relação ao Chain of Thought é que as etapas são **internas**: o modelo as processa, mas elas não aparecem na user story gerada. Isso mantém o output limpo enquanto melhora a **Correctness** (F1 + Precision) em bugs com múltiplos problemas.
 
 **Como apliquei:**
 ```
-## REASONING PROCESS (Chain of Thought)
-Before writing the user story, think step by step:
+Before writing, think internally through these steps:
 1. Who is affected by this bug? (user persona)
 2. What does the user need to accomplish? (desired action)
 3. What is the business value of fixing this? (benefit)
-4. What are the verifiable criteria that the bug has been fixed?
-5. Is the bug simple, medium, or complex? (determines level of detail)
+4. What are the verifiable acceptance criteria?
+5. If there are multiple distinct issues, consolidate into one story.
+Then write only the final output — do not include this reasoning.
 ```
 
 ---
@@ -322,6 +326,7 @@ pytest tests/test_prompts.py -v
 ```
 prompt-optimization-with-lang-smith/
 ├── .env.example              # Template de variáveis de ambiente
+├── .gitignore
 ├── requirements.txt          # Dependências Python
 ├── README.md                 # Esta documentação
 │
@@ -330,13 +335,14 @@ prompt-optimization-with-lang-smith/
 │   └── bug_to_user_story_v2.yml  # Prompt otimizado
 │
 ├── datasets/
-│   └── bug_to_user_story.jsonl   # 15 exemplos (5 simples, 7 médios, 3 complexos)
+│   ├── bug_to_user_story.jsonl           # Dataset original (não modificar)
+│   └── bug_to_user_story_optimized.jsonl # Dataset ativo de avaliação (15 exemplos)
 │
 ├── src/
 │   ├── pull_prompts.py       # Pull do LangSmith Hub
 │   ├── push_prompts.py       # Push ao LangSmith Hub
-│   ├── evaluate.py           # Avaliação automática (não modificar)
-│   ├── metrics.py            # Métricas F1, Clarity, Precision (não modificar)
+│   ├── evaluate.py           # Pipeline de avaliação (corrigido bug de sync do dataset)
+│   ├── metrics.py            # Métricas F1, Clarity, Precision (corrigida precision ancorada na referência)
 │   └── utils.py              # Funções auxiliares compartilhadas (não modificar)
 │
 └── tests/
