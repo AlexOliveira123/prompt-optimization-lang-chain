@@ -66,20 +66,19 @@ Then write only the final output — do not include this reasoning.
 
 ### v1 vs v2 Comparison
 
-| Metric       | v1 (low quality) | v2 (optimized)       | Target |
-|--------------|------------------|----------------------|--------|
-| Helpfulness  | ~0.45            | run `evaluate.py`    | 0.80   |
-| Correctness  | ~0.52            | run `evaluate.py`    | 0.80   |
-| F1-Score     | ~0.48            | run `evaluate.py`    | 0.80   |
-| Clarity      | ~0.50            | run `evaluate.py`    | 0.80   |
-| Precision    | ~0.46            | run `evaluate.py`    | 0.80   |
+| Metric       | v1 (low quality) | v2 (optimized) | Target |
+|--------------|------------------|----------------|--------|
+| Helpfulness  | ~0.45            | **0.94 ✓**     | 0.80   |
+| Correctness  | ~0.52            | **0.87 ✓**     | 0.80   |
+| F1-Score     | ~0.48            | **0.83 ✓**     | 0.80   |
+| Clarity      | ~0.50            | **0.96 ✓**     | 0.80   |
+| Precision    | ~0.46            | **0.91 ✓**     | 0.80   |
 
-> **Note:** Run `python src/evaluate.py` after pushing to see the real scores for your environment.
+**Overall average: 0.90 — all metrics ≥ 0.80 ✅**
 
 ### LangSmith Dashboard
-After running `python src/push_prompts.py` and `python src/evaluate.py`, access:
-- Prompts: `https://smith.langchain.com/hub/{your_username}`
-- Evaluations: `https://smith.langchain.com/projects/prompt-optimization-challenge-resolved`
+- Prompt: https://smith.langchain.com/hub/promptetesteee/bug_to_user_story_v2
+- Experiment: https://smith.langchain.com/o/21286397-602c-43b8-9bbd-dc767f0ac49b/datasets/b278f440-a555-4f1b-b175-0af4ae5c8494/compare?selectedSessions=d6c389d3-60ed-4b1e-9767-3b154f901aa3
 
 ---
 
@@ -248,20 +247,19 @@ Then write only the final output — do not include this reasoning.
 
 ### Comparativo v1 vs v2
 
-| Métrica      | v1 (baixa qualidade) | v2 (otimizado)          | Meta |
-|--------------|----------------------|-------------------------|------|
-| Helpfulness  | ~0.45                | execute `evaluate.py`   | 0.80 |
-| Correctness  | ~0.52                | execute `evaluate.py`   | 0.80 |
-| F1-Score     | ~0.48                | execute `evaluate.py`   | 0.80 |
-| Clarity      | ~0.50                | execute `evaluate.py`   | 0.80 |
-| Precision    | ~0.46                | execute `evaluate.py`   | 0.80 |
+| Métrica      | v1 (baixa qualidade) | v2 (otimizado) | Meta |
+|--------------|----------------------|----------------|------|
+| Helpfulness  | ~0.45                | **0.94 ✓**     | 0.80 |
+| Correctness  | ~0.52                | **0.87 ✓**     | 0.80 |
+| F1-Score     | ~0.48                | **0.83 ✓**     | 0.80 |
+| Clarity      | ~0.50                | **0.96 ✓**     | 0.80 |
+| Precision    | ~0.46                | **0.91 ✓**     | 0.80 |
 
-> **Nota:** Execute `python src/evaluate.py` após o push para ver os scores reais do seu ambiente.
+**Média geral: 0.90 — todas as métricas ≥ 0.80 ✅**
 
 ### Dashboard LangSmith
-Após executar `python src/push_prompts.py` e `python src/evaluate.py`, acesse:
-- Prompts: `https://smith.langchain.com/hub/{seu_username}`
-- Avaliações: `https://smith.langchain.com/projects/prompt-optimization-challenge-resolved`
+- Prompt: https://smith.langchain.com/hub/promptetesteee/bug_to_user_story_v2
+- Experimento: https://smith.langchain.com/o/21286397-602c-43b8-9bbd-dc767f0ac49b/datasets/b278f440-a555-4f1b-b175-0af4ae5c8494/compare?selectedSessions=d6c389d3-60ed-4b1e-9767-3b154f901aa3
 
 ---
 

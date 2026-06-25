@@ -7,6 +7,8 @@ from typing import List, Dict, Any
 from pathlib import Path
 from dotenv import load_dotenv
 from langsmith import Client
+from langsmith.evaluation import evaluate as ls_evaluate
+from langsmith.schemas import Run, Example
 from langchain import hub
 from utils import check_env_vars, print_section_header, get_llm, get_eval_llm
 from metrics import evaluate_f1_score, evaluate_clarity, evaluate_precision
@@ -63,63 +65,75 @@ def create_evaluation_dataset(client: Client, dataset_name: str, jsonl_path: str
         print(f"   ⚠️  Error creating dataset: {e}")
 
 
-def evaluate_prompt(prompt_name: str, dataset_name: str, client: Client) -> Dict[str, float]:
-    print(f"\n🔍 Evaluating: {prompt_name}")
-    try:
-        print(f"   Pulling prompt from LangSmith Hub: {prompt_name}")
-        prompt_template = hub.pull(prompt_name)
-        print("   ✓ Prompt loaded successfully")
-    except Exception as e:
-        print(f"❌ Could not load prompt '{prompt_name}': {e}")
-        raise
+def make_target(chain):
+    """Wrap chain so output is a plain dict serializable by LangSmith."""
+    def target(inputs: dict) -> dict:
+        return {"output": chain.invoke(inputs).content}
+    return target
 
-    try:
-        examples = list(client.list_examples(dataset_name=dataset_name))
-        print(f"   Dataset: {len(examples)} examples")
 
-        llm = get_llm(temperature=0)
-        eval_llm = get_eval_llm(temperature=0)
-        chain = prompt_template | llm
+def make_f1_evaluator(eval_llm):
+    def f1_evaluator(run: Run, example: Example) -> dict:
+        answer = (run.outputs or {}).get("output", "")
+        inputs = example.inputs or {}
+        reference = (example.outputs or {}).get("reference", "")
+        question = inputs.get("bug_report", inputs.get("question", "N/A"))
+        result = evaluate_f1_score(question, answer, reference, eval_llm)
+        return {"key": "f1_score", "score": result["score"]}
+    return f1_evaluator
 
-        f1_scores, clarity_scores, precision_scores = [], [], []
-        print("   Evaluating examples...")
 
-        for i, example in enumerate(examples, 1):
-            try:
-                inputs = example.inputs if hasattr(example, 'inputs') else {}
-                outputs = example.outputs if hasattr(example, 'outputs') else {}
-                answer = chain.invoke(inputs).content
-                reference = outputs.get("reference", "") if isinstance(outputs, dict) else ""
-                question = inputs.get("question", inputs.get("bug_report", inputs.get("pr_title", "N/A"))) if isinstance(inputs, dict) else "N/A"
-            except Exception as e:
-                print(f"      ⚠️  Error on example {i}: {e}")
+def make_clarity_evaluator(eval_llm):
+    def clarity_evaluator(run: Run, example: Example) -> dict:
+        answer = (run.outputs or {}).get("output", "")
+        inputs = example.inputs or {}
+        reference = (example.outputs or {}).get("reference", "")
+        question = inputs.get("bug_report", inputs.get("question", "N/A"))
+        result = evaluate_clarity(question, answer, reference, eval_llm)
+        return {"key": "clarity", "score": result["score"]}
+    return clarity_evaluator
+
+
+def make_precision_evaluator(eval_llm):
+    def precision_evaluator(run: Run, example: Example) -> dict:
+        answer = (run.outputs or {}).get("output", "")
+        inputs = example.inputs or {}
+        reference = (example.outputs or {}).get("reference", "")
+        question = inputs.get("bug_report", inputs.get("question", "N/A"))
+        result = evaluate_precision(question, answer, reference, eval_llm)
+        return {"key": "precision", "score": result["score"]}
+    return precision_evaluator
+
+
+def aggregate_results(experiment_results) -> Dict[str, float]:
+    f1_scores, clarity_scores, precision_scores = [], [], []
+    for row in experiment_results:
+        # evaluation_results is a plain dict: {"results": [EvaluationResult, ...]}
+        eval_results = row.get("evaluation_results", {})
+        results_list = eval_results.get("results", []) if isinstance(eval_results, dict) else []
+        for er in results_list:
+            key = er.key if hasattr(er, "key") else er.get("key", "")
+            score = er.score if hasattr(er, "score") else er.get("score", 0.0)
+            if score is None:
                 continue
+            if key == "f1_score":
+                f1_scores.append(float(score))
+            elif key == "clarity":
+                clarity_scores.append(float(score))
+            elif key == "precision":
+                precision_scores.append(float(score))
 
-            if not answer:
-                continue
+    avg_f1 = sum(f1_scores) / len(f1_scores) if f1_scores else 0.0
+    avg_clarity = sum(clarity_scores) / len(clarity_scores) if clarity_scores else 0.0
+    avg_precision = sum(precision_scores) / len(precision_scores) if precision_scores else 0.0
 
-            f1 = evaluate_f1_score(question, answer, reference, eval_llm)
-            clarity = evaluate_clarity(question, answer, reference, eval_llm)
-            precision = evaluate_precision(question, answer, reference, eval_llm)
-            f1_scores.append(f1["score"])
-            clarity_scores.append(clarity["score"])
-            precision_scores.append(precision["score"])
-            print(f"      [{i}/{len(examples)}] F1:{f1['score']:.2f} (P:{f1['precision']:.2f} R:{f1['recall']:.2f}) Clarity:{clarity['score']:.2f} Precision:{precision['score']:.2f}")
-
-        avg_f1 = sum(f1_scores) / len(f1_scores) if f1_scores else 0.0
-        avg_clarity = sum(clarity_scores) / len(clarity_scores) if clarity_scores else 0.0
-        avg_precision = sum(precision_scores) / len(precision_scores) if precision_scores else 0.0
-
-        return {
-            "helpfulness": round((avg_clarity + avg_precision) / 2, 4),
-            "correctness": round((avg_f1 + avg_precision) / 2, 4),
-            "f1_score": round(avg_f1, 4),
-            "clarity": round(avg_clarity, 4),
-            "precision": round(avg_precision, 4),
-        }
-    except Exception as e:
-        print(f"   ❌ Evaluation error: {e}")
-        return {"helpfulness": 0.0, "correctness": 0.0, "f1_score": 0.0, "clarity": 0.0, "precision": 0.0}
+    return {
+        "helpfulness": round((avg_clarity + avg_precision) / 2, 4),
+        "correctness": round((avg_f1 + avg_precision) / 2, 4),
+        "f1_score": round(avg_f1, 4),
+        "clarity": round(avg_clarity, 4),
+        "precision": round(avg_precision, 4),
+    }
 
 
 def display_results(prompt_name: str, scores: Dict[str, float]) -> bool:
@@ -173,12 +187,41 @@ def main():
     create_evaluation_dataset(client, dataset_name, jsonl_path)
 
     prompt_name = f"{username}/bug_to_user_story_v2"
+    print(f"\n🔍 Evaluating: {prompt_name}")
     try:
-        scores = evaluate_prompt(prompt_name, dataset_name, client)
+        print(f"   Pulling prompt from LangSmith Hub: {prompt_name}")
+        prompt_template = hub.pull(prompt_name)
+        print("   ✓ Prompt loaded successfully")
+    except Exception as e:
+        print(f"❌ Could not load prompt '{prompt_name}': {e}")
+        return 1
+
+    llm = get_llm(temperature=0)
+    eval_llm = get_eval_llm(temperature=0)
+    chain = prompt_template | llm
+
+    print("   Running evaluation (results will appear in LangSmith Experiments tab)...")
+    try:
+        experiment_results = ls_evaluate(
+            make_target(chain),
+            data=dataset_name,
+            evaluators=[
+                make_f1_evaluator(eval_llm),
+                make_clarity_evaluator(eval_llm),
+                make_precision_evaluator(eval_llm),
+            ],
+            experiment_prefix="v2",
+            client=client,
+            max_concurrency=0,
+        )
+
+        scores = aggregate_results(experiment_results)
         passed = display_results(prompt_name, scores)
     except Exception as e:
-        print(f"\n❌ Failed to evaluate '{prompt_name}': {e}")
-        passed = False
+        print(f"\n❌ Evaluation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
 
     print("\n" + "=" * 50)
     if passed:
